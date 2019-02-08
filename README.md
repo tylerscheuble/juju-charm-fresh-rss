@@ -10,14 +10,7 @@ Step by step instructions on using the charm:
   $ juju deploy fresh-rss
   $ juju expose fresh-rss
 
-You can then browse to http://ip-address to configure the service.
-
-# Configuration
-
-The configuration options will be listed on the charm store, however If you're
-making assumptions or opinionated decisions in the charm (like setting a default
-administrator password), you should detail that here so the user knows how to
-change it immediately, etc.
+You can then browse to http://ip-address to configure FreshRSS.
 
 # Author and Charm Details
 

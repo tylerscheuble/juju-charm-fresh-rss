@@ -1,11 +1,10 @@
-name: freshrss
-summary: <Fill in summary here>
-maintainer: Tyler <tyler@scheuble.us>
+name: fresh-rss
+summary: FreshRSS is a self-hosted RSS feed aggregator like Leed or Kriss Feed.
+maintainer: tylerscheuble <tyler@scheuble.us>
 description: |
-  <Multi-line description here>
+  FreshRSS is an RSS aggregator and reader. It allows you to read and follow several
+  news websites at a glance without the need to browse from one website to another.
 tags:
-  # Replace "misc" with one or more whitelisted tags from this list:
-  # https://jujucharms.com/docs/stable/authors-charm-metadata
   - misc
 series: ['bionic']
 subordinate: false

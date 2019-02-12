@@ -7,7 +7,9 @@ description: |
 tags:
   - misc
 series: ['bionic']
-subordinate: false
+requires:
+  db:
+    interface: mysql
 resources:
   fresh-rss-tarball:
     type: file

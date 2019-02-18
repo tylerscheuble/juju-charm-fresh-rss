@@ -2,6 +2,7 @@ includes:
 - layer:basic
 - layer:nginx
 - layer:apt
+- interface:pgsql
 repo: https://github.com/tylerscheuble/juju-charm-fresh-rss
 options:
   apt:

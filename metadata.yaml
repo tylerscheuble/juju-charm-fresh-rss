@@ -8,8 +8,8 @@ tags:
   - misc
 series: ['bionic']
 requires:
-  db:
-    interface: mysql
+  database:
+    interface: pgsql
 resources:
   fresh-rss-tarball:
     type: file

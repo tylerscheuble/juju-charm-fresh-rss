@@ -17,3 +17,4 @@ options:
       - php7.2-sqlite3
       - php7.2-xml
       - php7.2-zip
+      - php7.2-pgsql

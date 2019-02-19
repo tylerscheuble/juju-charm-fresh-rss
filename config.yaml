@@ -7,10 +7,6 @@ options:
     type: string
     default: admin
     description: "Name of default FreshRSS user"
-  default-user-password:
-    type: string
-    default: ""
-    description: "Password of default FreshRSS user"
   language:
     type: string
     default: en

@@ -1,17 +1,26 @@
 from pathlib import Path
-from subprocess import check_call
+from subprocess import check_call, PIPE, STDOUT
 
-from charmhelpers.core import hookenv
+from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core.hookenv import status_set, log
-from charms.reactive import endpoint_from_flag, when, when_not, set_flag
+
+from charms.reactive import (
+        endpoint_from_flag,
+        when,
+        when_not,
+        set_flag,
+        is_flag_set
+)
+
 from charms.layer.nginx import configure_site
 
 fresh_rss_dir = Path('/usr/share/FreshRSS')
 config = hookenv.config()
+kv = unitdata.kv()
 
 
 @when_not('freshrss.installed')
-@when('database.available',
+@when('database.master.available',
       'apt.installed.php7.2',
       'apt.installed.php7.2-fpm',
       'apt.installed.php7.2-curl',
@@ -20,7 +29,8 @@ config = hookenv.config()
       'apt.installed.php7.2-mbstring',
       'apt.installed.php7.2-sqlite3',
       'apt.installed.php7.2-xml',
-      'apt.installed.php7.2-zip')
+      'apt.installed.php7.2-zip',
+      'apt.installed.php7.2-pgsql')
 def install_freshrss():
     """Install FreshRSS
     """
@@ -45,23 +55,6 @@ def install_freshrss():
 
     status_set('active', 'FreshRSS installed')
     set_flag('freshrss.installed')
-
-
-@when('freshrss.installed',
-      'database.available')
-@when_not('freshrss.defaultuser.created')
-def create_default_user():
-    user = config['default-user-name']
-    password = config['default-user-password']
-
-    if not password:
-        status_set('blocked', 'Please set user password')
-        return
-
-    run_script('create-user', ['--user', user, '--password', password])
-
-    status_set('active', 'Default user created')
-    set_flag('freshrss.defaultuser.created')
 
 
 @when('freshrss.defaultuser.created')
@@ -91,6 +84,10 @@ def update_config():
 
 
 def get_config_options():
+    if not is_flag_set('database.master.available'):
+        status_set('error', 'Database can not be found')
+        raise Exception('Database can not be found')
+
     opts = []
 
     opts.extend(['--default_user', config['default-user']])
@@ -98,36 +95,16 @@ def get_config_options():
     opts.extend(['--environment', config['environment']])
 
     # db specific
-    database = endpoint_from_flag('database.available')
-    if not database:
-        log('error', 'Database can not be found')
-        status_set('error', 'Database can not be found')
-        raise Exception('Database can not be found')
-
-    log('DB: {}'.format(database))
-    log('DIR: {}'.format(dir(database)))
-
-    opts.extend(['--db-type', 'mysql'])
-    opts.extend(['--db-base', 'freshrss'])
-    opts.extend(['--db-user', database.db_user('freshrss')])
-    opts.extend(['--db-password', database.db_password('freshrss')])
-    opts.extend(['--db-host', database.db_host('freshrss')])
+    opts.extend(['--db-type', 'pgsql'])
+    opts.extend(['--db-base', 'fresh-rss'])
+    opts.extend(['--db-user', kv.get('db-user')])
+    opts.extend(['--db-password', kv.get('db-password')])
+    opts.extend(['--db-host', kv.get('db-host')])
     opts.extend(['--db-prefix', config['db-prefix']])
 
+    log('Opts: {}'.format(' '.join(opts)))
+
     return opts
-
-
-@when('database.connected')
-@when_not('database.available')
-def setup_database():
-    log('Waiting for database to connect')
-    status_set('blocked', 'waiting for database')
-
-
-@when('database.available')
-def setup_mysql(db):
-    get_config_options()
-    status_set('active', 'database available')
 
 
 def apply_permissions():
@@ -141,24 +118,27 @@ def apply_permissions():
 def run_script(script, opts=[]):
     cmd = [str(fresh_rss_dir.joinpath('cli', '{}.php'.format(script))), *opts]
     log('Running script: {}'.format(cmd))
+    check_call(cmd, stdout=PIPE, stderr=STDOUT)
 
 
-@when_not('freshrss.database.configured',
-          'database.connected')
-def wait_for_relation():
-    status_set('blocked', 'Please add database relation')
-
-
-@when('database.connected')
-def configure_database(db):
-    database = endpoint_from_flag('database.connected')
-    log('DIR2: {}'.format(dir(database)))
-    log('DIR3: {}'.format(dir(db)))
-    database.configure('freshrss', config['db-user'],
-                       prefix=config['db-prefix'])
+@when_not('database.connected')
+def waiting_for_db():
+    status_set('blocked', 'Waiting for postgres connection')
 
 
 @when('database.connected')
-@when_not('database.available')
-def wait_for_db():
-    status_set('waiting', 'Waiting for database')
+def choose_db():
+    pgsql = endpoint_from_flag('database.connected')
+    pgsql.set_database('fresh-rss')
+
+
+@when('database.master.available')
+def get_db_config():
+    pgsql = endpoint_from_flag('database.master.available')
+    db = pgsql.master
+    hookenv.status_set('active', 'connected to PostgreSQL at {}'
+                                 .format(db.host))
+
+    kv.set('db-user', db.user)
+    kv.set('db-password', db.password)
+    kv.set('db-host', db.host)

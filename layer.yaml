@@ -2,6 +2,7 @@ includes:
 - layer:basic
 - layer:nginx
 - layer:apt
+- layer:status
 - interface:pgsql
 repo: https://github.com/tylerscheuble/juju-charm-fresh-rss
 options:
@@ -18,3 +19,4 @@ options:
       - php7.2-xml
       - php7.2-zip
       - php7.2-pgsql
+exclude: ['[._]*.s[a-z][a-z]'] # vim swap files

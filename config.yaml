@@ -3,17 +3,21 @@ options:
     type: int
     default: 80
     description: "Port to be used from the web server"
-  default-user:
+  default-admin-username:
     type: string
     default: admin
     description: "Name of default FreshRSS user"
+  default-admin-password:
+    type: string
+    default: password
+    description: "Password of default FreshRSS user. It is recommended to changed this password."
   language:
     type: string
     default: en
     description: "Language for FreshRSS installation"
   auth-type:
     type: string
-    default: none
+    default: form
     description: "Can be: 'form', 'http_auth' (using the Web server access control), 'none' (dangerous)"
   db-user:
     type: string
@@ -21,12 +25,12 @@ options:
     description: "Name for the FreshRSS user in the database"
   db-prefix:
     type: string
-    default: "freshrss"
+    default: "freshrss_"
     description: "An optional prefix in front of the names of the tables"
   environment:
     type: string
     default: debug
   base-url:
     type: string
-    default: 'rss.pdl'
+    default: "freshrss.example.com"
     description: "Should be a public (routable) URL if possible, and is used for push (WebSub), for some API functions (e.g. favicons), and external URLs in FreshRSS."

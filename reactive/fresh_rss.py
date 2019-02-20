@@ -1,27 +1,28 @@
-from pathlib import Path
-from subprocess import check_call, PIPE, STDOUT
+from charmhelpers.core.hookenv import log
 
+from subprocess import check_call
 from charmhelpers.core import hookenv, unitdata
-from charmhelpers.core.hookenv import status_set, log
-
 from charms.reactive import (
-        endpoint_from_flag,
-        when,
-        when_not,
-        set_flag,
-        is_flag_set
+    endpoint_from_flag,
+    when,
+    when_not,
+    set_flag
 )
 
 from charms.layer.nginx import configure_site
+from charms.layer import status
+from charms.layer.fresh_rss import (
+    fresh_rss_dir,
+    apply_permissions,
+    run_script
+)
 
-fresh_rss_dir = Path('/usr/share/FreshRSS')
 config = hookenv.config()
 kv = unitdata.kv()
 
 
-@when_not('freshrss.installed')
-@when('database.master.available',
-      'apt.installed.php7.2',
+@when_not('fresh-rss.system.initalized')
+@when('apt.installed.php7.2',
       'apt.installed.php7.2-fpm',
       'apt.installed.php7.2-curl',
       'apt.installed.php7.2-gmp',
@@ -31,14 +32,51 @@ kv = unitdata.kv()
       'apt.installed.php7.2-xml',
       'apt.installed.php7.2-zip',
       'apt.installed.php7.2-pgsql')
-def install_freshrss():
+def init_fresh_rss():
+    set_flag('fresh-rss.system.initialized')
+
+
+@when_not('database.connected')
+def waiting_for_db():
+    status.blocked('Waiting for postgres connection')
+
+
+@when('database.connected')
+@when_not('fresh-rss.db.requested')
+def request_db():
+    pgsql = endpoint_from_flag('database.connected')
+    pgsql.set_database('fresh-rss')
+    set_flag('fresh-rss.db.requested')
+
+
+@when('database.master.available',
+      'fresh-rss.db.requested')
+@when_not('fresh-rss.db.config.acquired')
+def acquire_db_config():
+    status.active('connected to PostgreSQL')
+    pgsql = endpoint_from_flag('database.master.available')
+
+    if pgsql is None:
+        log('Master not found', level='ERROR')
+
+    db = pgsql.master
+    kv.set('db-user', db.user)
+    kv.set('db-password', db.password)
+    kv.set('db-host', db.host)
+    set_flag('fresh-rss.db.config.acquired')
+
+
+@when_not('fresh-rss.installed')
+@when('fresh-rss.db.config.acquired',
+      'fresh-rss.system.initialized')
+def install_fresh_rss():
     """Install FreshRSS
     """
 
     source = hookenv.resource_get('fresh-rss-tarball')
     if not source:
         log('Could not find resource fresh-rss-tarball')
-        status_set('blocked', 'Need fresh-rss-tarball resource')
+        status.blocked('Need fresh-rss-tarball resource')
         return
 
     check_call(['mkdir', '-p', str(fresh_rss_dir)])
@@ -47,98 +85,57 @@ def install_freshrss():
     log('Extracting FreshRSS: {}'.format(' '.join(cmd)))
     check_call(cmd)
 
+    apply_permissions()
+
+    install_opts = []
+    install_opts.extend(['--default_user', config['default-admin-username']])
+    install_opts.extend(['--base_url', config['base-url']])
+    install_opts.extend(['--environment', config['environment']])
+
+    # db specific
+    install_opts.extend(['--db-type', 'pgsql'])
+    install_opts.extend(['--db-base', 'fresh-rss'])
+    install_opts.extend(['--db-user', kv.get('db-user')])
+    install_opts.extend(['--db-password', kv.get('db-password')])
+    install_opts.extend(['--db-host', kv.get('db-host')])
+    install_opts.extend(['--db-prefix', config['db-prefix']])
+
     # ensure the needed directories in ./data/
     run_script('prepare')
-    run_script('do-install', get_config_options())
+    run_script('do-install', install_opts)
+    run_script('create-user', ['--user', config['default-admin-username'],
+                               '--password', config['default-admin-password']])
 
     apply_permissions()
 
-    status_set('active', 'FreshRSS installed')
-    set_flag('freshrss.installed')
+    status.active('FreshRSS installed')
+    set_flag('fresh-rss.installed')
 
 
-@when('freshrss.defaultuser.created')
-@when_not('freshrss.nginx.configured')
+@when('fresh-rss.installed')
+@when_not('fresh-rss.nginx.configured')
 def configure_nginx():
     """Configure NGINX server for fresh_rss
     """
 
-    configure_site('freshrss', 'fresh-rss.conf')
-    status_set('active', 'ready')
-    status_set('active', 'nginx configured')
-    set_flag('freshrss.nginx.configured')
+    configure_site('fresh-rss', 'fresh-rss.conf')
+    hookenv.open_port(config['port'])
+    status.active('nginx configured')
+    set_flag('fresh-rss.nginx.configured')
 
 
-@when('freshrss.nginx.configured', 'website.available')
+@when('fresh-rss.installed',
+      'fresh-rss.nginx.configured')
+@when_not('fresh-rss.ready')
+def acquire_goal_state():
+    status.active('Ready')
+    set_flag('fresh-rss.ready')
+
+
+@when('fresh-rss.ready',
+      'website.available')
 def configure_website():
     """Send port data to website endpoint.
     """
     endpoint = endpoint_from_flag('website.available')
     endpoint.configure(port=config['port'])
-
-
-@when('freshrss.installed',
-      'config.changed')
-def update_config():
-    run_script('reconfigure', get_config_options())
-
-
-def get_config_options():
-    if not is_flag_set('database.master.available'):
-        status_set('error', 'Database can not be found')
-        raise Exception('Database can not be found')
-
-    opts = []
-
-    opts.extend(['--default_user', config['default-user']])
-    opts.extend(['--base_url', config['base-url']])
-    opts.extend(['--environment', config['environment']])
-
-    # db specific
-    opts.extend(['--db-type', 'pgsql'])
-    opts.extend(['--db-base', 'fresh-rss'])
-    opts.extend(['--db-user', kv.get('db-user')])
-    opts.extend(['--db-password', kv.get('db-password')])
-    opts.extend(['--db-host', kv.get('db-host')])
-    opts.extend(['--db-prefix', config['db-prefix']])
-
-    log('Opts: {}'.format(' '.join(opts)))
-
-    return opts
-
-
-def apply_permissions():
-    log('Applying permissions')
-    check_call(['chown', '-R', ':www-data', str(fresh_rss_dir)])
-    check_call(['chmod', '-R', 'g+r', str(fresh_rss_dir)])
-    check_call(['chmod', '-R', 'g+w', str(fresh_rss_dir)])
-    check_call(['chmod', '-R', 'g+w', str(fresh_rss_dir.joinpath('data'))])
-
-
-def run_script(script, opts=[]):
-    cmd = [str(fresh_rss_dir.joinpath('cli', '{}.php'.format(script))), *opts]
-    log('Running script: {}'.format(cmd))
-    check_call(cmd, stdout=PIPE, stderr=STDOUT)
-
-
-@when_not('database.connected')
-def waiting_for_db():
-    status_set('blocked', 'Waiting for postgres connection')
-
-
-@when('database.connected')
-def choose_db():
-    pgsql = endpoint_from_flag('database.connected')
-    pgsql.set_database('fresh-rss')
-
-
-@when('database.master.available')
-def get_db_config():
-    pgsql = endpoint_from_flag('database.master.available')
-    db = pgsql.master
-    hookenv.status_set('active', 'connected to PostgreSQL at {}'
-                                 .format(db.host))
-
-    kv.set('db-user', db.user)
-    kv.set('db-password', db.password)
-    kv.set('db-host', db.host)

@@ -1,4 +1,5 @@
 name: fresh-rss
+display-name: FreshRSS
 summary: FreshRSS is a self-hosted RSS feed aggregator like Leed or Kriss Feed.
 maintainer: tylerscheuble <tyler@scheuble.us>
 description: |

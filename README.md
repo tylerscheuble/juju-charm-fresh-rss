@@ -7,13 +7,18 @@ news websites at a glance without the need to browse from one website to another
 
 Step by step instructions on using the charm:
 
-  $ juju deploy fresh-rss
-  $ juju expose fresh-rss
+    $ juju deploy fresh-rss
+    $ juju deploy postgresql
+    $ juju relate fresh-rss postgresql:db
+    $ juju expose fresh-rss
 
-You can then browse to http://ip-address to configure FreshRSS.
+You can then browse to `http://<ip-address-of-freshrss>` to configure FreshRSS.
 
-# Author and Charm Details
+#### Copyright
+Tyler Scheuble (c) <tyler@scheuble.us>
 
-Author: Tyler Scheuble (tyler@scheuble.us)
-Report bugs at: https://github.com/tylerscheuble/juju-charm-fresh-rss
-Location: https://jujucharms.com/fresh-rss
+#### License
+AGPLv3 - See `LICENSE` file in the same directory as this readme.
+
+#### Issues/Bugs/Feature Requests
+Report bugs/feature requests on the [github issues page for this charm](https://github.com/tylerscheuble/juju-charm-fresh-rss/issues)

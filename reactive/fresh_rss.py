@@ -39,6 +39,7 @@ def init_fresh_rss():
 @when_not('database.connected')
 def waiting_for_db():
     status.blocked('Waiting for postgres connection')
+    return
 
 
 @when('database.connected')
@@ -53,7 +54,6 @@ def request_db():
       'fresh-rss.db.requested')
 @when_not('fresh-rss.db.config.acquired')
 def acquire_db_config():
-    status.active('connected to PostgreSQL')
     pgsql = endpoint_from_flag('database.master.available')
 
     if pgsql is None:
@@ -63,6 +63,8 @@ def acquire_db_config():
     kv.set('db-user', db.user)
     kv.set('db-password', db.password)
     kv.set('db-host', db.host)
+
+    status.active('connected to PostgreSQL')
     set_flag('fresh-rss.db.config.acquired')
 
 
@@ -89,7 +91,7 @@ def install_fresh_rss():
 
     install_opts = []
     install_opts.extend(['--default_user', config['default-admin-username']])
-    install_opts.extend(['--base_url', config['base-url']])
+    install_opts.extend(['--base_url', config['fqdn']])
     install_opts.extend(['--environment', config['environment']])
 
     # db specific
@@ -118,8 +120,12 @@ def configure_nginx():
     """Configure NGINX server for fresh_rss
     """
 
-    configure_site('fresh-rss', 'fresh-rss.conf')
-    hookenv.open_port(config['port'])
+    ctxt = {'fqdn': config('fqdn'),
+            'port': config('port')}
+
+    configure_site('fresh-rss', 'fresh-rss.conf', **ctxt)
+    hookenv.open_port(ctxt['port'])
+
     status.active('nginx configured')
     set_flag('fresh-rss.nginx.configured')
 

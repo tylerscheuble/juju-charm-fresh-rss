@@ -4,6 +4,11 @@ options:
     default: 80
     description: |
       Port to be used from the web server.
+  db-uri:
+    type: string
+    default: ""
+    description: |
+      MySQL or PostgreSQL db-uri to use for Fresh-RSS database.
   default-admin-username:
     type: string
     default: admin

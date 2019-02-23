@@ -1,15 +1,15 @@
-#!/usr/bin/python3
-
-from charms.layer.fresh_rss import run_script
+#!/usr/local/sbin/charm-env python3
 
 from charmhelpers.core.hookenv import (
     action_get
 )
 
+from charms.layer.fresh_rss import run_script
+
 if __name__ == '__main__':
     opts = []
 
     for arg, value in action_get().items():
-        opts.append([arg.replace('_', '-'), value])
+        opts.extend(['--' + arg.replace('_', '-'), value])
 
     run_script('create-user', opts)

@@ -4,6 +4,7 @@ includes:
 - layer:apt
 - layer:status
 - layer:leadership
+- interface:mysql-shared
 - interface:pgsql
 repo: https://github.com/tylerscheuble/juju-charm-fresh-rss
 options:

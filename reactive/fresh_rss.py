@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from charmhelpers.core.hookenv import log
 
 from subprocess import check_call
@@ -24,6 +26,23 @@ config = hookenv.config()
 kv = unitdata.kv()
 
 
+@when_not('manual.database.check.complete')
+def check_user_provided_database():
+    if config('db-uri'):
+        db_uri = urlparse(config('db-uri'))
+        kv.set('db-scheme', db_uri.scheme)
+        kv.set('db-user', db_uri.username)
+        kv.set('db-password', db_uri.password)
+        kv.set('db-host', db_uri.hostname)
+        kv.set('db-base', db_uri.path)
+
+        log("Manual database configured")
+        set_flag('fresh-rss.db.config.acquired')
+    else:
+        hookenv.log("Manual database not configured")
+    set_flag('manual.database.check.complete')
+
+
 @when_not('fresh-rss.system.initalized')
 @when('apt.installed.php7.2',
       'apt.installed.php7.2-fpm',
@@ -39,35 +58,68 @@ def init_fresh_rss():
     set_flag('fresh-rss.system.initialized')
 
 
-@when_not('database.connected')
+@when_not('fresh-rss.db.config.acquired')
 def waiting_for_db():
-    status.blocked('Waiting for postgres connection')
+    status.blocked('Waiting for database relation or configuration')
     return
 
 
-@when('database.connected')
+# Postgresql db relation handlers
+@when_any('pgsql.connected', 'mysql.connected')
 @when_not('fresh-rss.db.requested')
 def request_db():
-    pgsql = endpoint_from_flag('database.connected')
-    pgsql.set_database('fresh-rss')
+    """Request the database from postgresql or mysql
+    """
+    db_name = "fresh-rss"
+    db_prefix = "fresh-rss"
+    db_user = "juju_fresh-rss"
+
+    if is_flag_set('pgsql.connected'):
+        pgsql = endpoint_from_flag('pgsql.connected')
+        pgsql.set_database(db_name)
+    elif is_flag_set('mysql.connected'):
+        mysql = endpoint_from_flag('mysql.connected')
+        mysql.configure(db_name, db_user, prefix=db_prefix)
     set_flag('fresh-rss.db.requested')
 
 
-@when('database.master.available',
-      'fresh-rss.db.requested')
+@when('fresh-rss.db.requested')
+@when_any('pgsql.master.available', 'mysql.available')
 @when_not('fresh-rss.db.config.acquired')
-def acquire_db_config():
-    pgsql = endpoint_from_flag('database.master.available')
+def acquire_postgresql_db_config():
+    """Acquire juju provided database config
+    """
 
-    if pgsql is None:
-        log('Master not found', level='ERROR')
+    if is_flag_set('pgsql.master.available'):
+        pgsql = endpoint_from_flag('pgsql.master.available')
 
-    db = pgsql.master
-    kv.set('db-user', db.user)
-    kv.set('db-password', db.password)
-    kv.set('db-host', db.host)
+        if pgsql is None:
+            log('PostgeSQL not found', level='ERROR')
+            return
 
-    status.active('connected to PostgreSQL')
+        db = pgsql.master
+
+        kv.set('db-scheme', 'pgsql')
+        kv.set('db-user', db.user)
+        kv.set('db-password', db.password)
+        kv.set('db-host', db.host)
+        kv.set('db-base', db.dbname)
+
+    elif is_flag_set('mysql.available'):
+        mysql = endpoint_from_flag('mysql.available')
+        prefix = "fresh-rss"
+
+        if mysql is None:
+            log('MySQL not found', level='ERROR')
+            return
+
+        kv.set('db-scheme', 'mysql')
+        kv.set('db-user', mysql.username(prefix))
+        kv.set('db-password', mysql.password(prefix))
+        kv.set('db-host', mysql.hostname(prefix))
+        kv.set('db-base', mysql.database(prefix)
+
+    status.active('Fresh-RSS Database Acquired')
     set_flag('fresh-rss.db.config.acquired')
 
 
@@ -98,8 +150,8 @@ def install_fresh_rss():
     install_opts.extend(['--environment', config['environment']])
 
     # db specific
-    install_opts.extend(['--db-type', 'pgsql'])
-    install_opts.extend(['--db-base', 'fresh-rss'])
+    install_opts.extend(['--db-type', kv.get('db-scheme')])
+    install_opts.extend(['--db-base', kv.get('db-base')])
     install_opts.extend(['--db-user', kv.get('db-user')])
     install_opts.extend(['--db-password', kv.get('db-password')])
     install_opts.extend(['--db-host', kv.get('db-host')])
@@ -127,8 +179,7 @@ def configure_nginx():
     """Configure NGINX server for fresh_rss
     """
 
-    ctxt = {'fqdn': config['fqdn'],
-            'port': config['port']}
+    ctxt = {'fqdn': config('fqdn'), 'port': config('port')}
 
     configure_site('fresh-rss', 'fresh-rss.conf', **ctxt)
     hookenv.open_port(ctxt['port'])

@@ -9,8 +9,10 @@ tags:
   - misc
 series: ['bionic']
 requires:
-  database:
+  pgsql:
     interface: pgsql
+  mysql:
+    interface: mysql-shared
 resources:
   fresh-rss-tarball:
     type: file

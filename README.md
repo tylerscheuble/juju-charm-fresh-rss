@@ -27,11 +27,11 @@ a user supplied database.
 
 You can then browse to `http://<ip-address-of-freshrss>` to configure FreshRSS.
 
-#### Copyright
+### Copyright
 Tyler Scheuble (c) <tyler@scheuble.us>
 
-#### License
+### License
 AGPLv3 - See `LICENSE` file in the same directory as this readme.
 
-#### Issues/Bugs/Feature Requests
+### Issues/Bugs/Feature Requests
 Report bugs/feature requests on the [github issues page for this charm](https://github.com/tylerscheuble/juju-charm-fresh-rss/issues)

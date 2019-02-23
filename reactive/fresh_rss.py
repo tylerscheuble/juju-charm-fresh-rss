@@ -110,8 +110,8 @@ def install_fresh_rss():
     run_script('do-install', install_opts)
 
     if not is_flag_set('leadership.set.default_admin_init'):
-        run_script('create-user',
-            ['--user', config['default-admin-username'],
+        run_script('create-user', [
+             '--user', config['default-admin-username'],
              '--password', config['default-admin-password']])
         charms.leadership.leader_set(default_admin_init="true")
 
@@ -127,8 +127,8 @@ def configure_nginx():
     """Configure NGINX server for fresh_rss
     """
 
-    ctxt = {'fqdn': config('fqdn'),
-            'port': config('port')}
+    ctxt = {'fqdn': config['fqdn'],
+            'port': config['port']}
 
     configure_site('fresh-rss', 'fresh-rss.conf', **ctxt)
     hookenv.open_port(ctxt['port'])

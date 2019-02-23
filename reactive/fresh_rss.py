@@ -4,10 +4,13 @@ from subprocess import check_call
 from charmhelpers.core import hookenv, unitdata
 from charms.reactive import (
     endpoint_from_flag,
+    is_flag_set,
     when,
     when_not,
     set_flag
 )
+
+import charms.leadership
 
 from charms.layer.nginx import configure_site
 from charms.layer import status
@@ -105,8 +108,12 @@ def install_fresh_rss():
     # ensure the needed directories in ./data/
     run_script('prepare')
     run_script('do-install', install_opts)
-    run_script('create-user', ['--user', config['default-admin-username'],
-                               '--password', config['default-admin-password']])
+
+    if not is_flag_set('leadership.set.default_admin_init'):
+        run_script('create-user',
+            ['--user', config['default-admin-username'],
+             '--password', config['default-admin-password']])
+        charms.leadership.leader_set(default_admin_init="true")
 
     apply_permissions()
 

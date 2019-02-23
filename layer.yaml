@@ -3,6 +3,7 @@ includes:
 - layer:nginx
 - layer:apt
 - layer:status
+- layer:leadership
 - interface:pgsql
 repo: https://github.com/tylerscheuble/juju-charm-fresh-rss
 options:

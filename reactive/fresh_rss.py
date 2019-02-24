@@ -9,7 +9,9 @@ from charms.reactive import (
     is_flag_set,
     when,
     when_not,
-    set_flag
+    when_any,
+    set_flag,
+    clear_flag
 )
 
 import charms.leadership
@@ -28,8 +30,8 @@ kv = unitdata.kv()
 
 @when_not('manual.database.check.complete')
 def check_user_provided_database():
-    if config('db-uri'):
-        db_uri = urlparse(config('db-uri'))
+    if config['db-uri']:
+        db_uri = urlparse(config['db-uri'])
         kv.set('db-scheme', db_uri.scheme)
         kv.set('db-user', db_uri.username)
         kv.set('db-password', db_uri.password)
@@ -39,7 +41,7 @@ def check_user_provided_database():
         log("Manual database configured")
         set_flag('fresh-rss.db.config.acquired')
     else:
-        hookenv.log("Manual database not configured")
+        log("Manual database not configured")
     set_flag('manual.database.check.complete')
 
 
@@ -117,7 +119,7 @@ def acquire_postgresql_db_config():
         kv.set('db-user', mysql.username(prefix))
         kv.set('db-password', mysql.password(prefix))
         kv.set('db-host', mysql.hostname(prefix))
-        kv.set('db-base', mysql.database(prefix)
+        kv.set('db-base', mysql.database(prefix))
 
     status.active('Fresh-RSS Database Acquired')
     set_flag('fresh-rss.db.config.acquired')
@@ -179,7 +181,7 @@ def configure_nginx():
     """Configure NGINX server for fresh_rss
     """
 
-    ctxt = {'fqdn': config('fqdn'), 'port': config('port')}
+    ctxt = {'fqdn': config['fqdn'], 'port': config['port']}
 
     configure_site('fresh-rss', 'fresh-rss.conf', **ctxt)
     hookenv.open_port(ctxt['port'])
@@ -203,3 +205,18 @@ def configure_website():
     """
     endpoint = endpoint_from_flag('website.available')
     endpoint.configure(port=config['port'])
+
+@when('config.changed.db-uri',
+      'manual.database.check.complete')
+@when_not('fresh-rss.ready',
+          'fresh-rss.db.config.acquired')
+def reset_manual_db_check():
+    """If the user intends to use a manually specified db-uri
+    but forgets to specify it at deploy time the charm will block.
+    In this case the user can then set a manually configured database by
+    setting the charm's 'db-uri' config option.
+    This handler will unset the manual database checked flag, so the manual
+    check may run again and set the db creds if the config is set while the
+    charm is in the blocked state.
+    """
+    clear_flag('manual.database.check.complete')

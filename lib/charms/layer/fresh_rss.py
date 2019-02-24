@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from subprocess import check_call, PIPE, STDOUT
+from subprocess import check_call, PIPE
 from charmhelpers.core.hookenv import log
 
 
@@ -9,12 +9,12 @@ fresh_rss_dir = Path('/usr/share/FreshRSS')
 
 def run(args):
     log('Executing: {}'.format(' '.join(args)))
-    check_call(['sudo', '-u', 'www-data', *args], stdout=PIPE, stderr=STDOUT)
+    check_call(['sudo', '-u', 'www-data', *args], stdout=PIPE, stderr=PIPE)
 
 
 def run_root(args):
     log('Executing: {} as root'.format(' '.join(args)))
-    check_call(args, stdout=PIPE, stderr=STDOUT)
+    check_call(args, stdout=PIPE, stderr=PIPE)
 
 
 def apply_permissions():

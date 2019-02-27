@@ -4,7 +4,7 @@ from subprocess import check_call, PIPE
 from charmhelpers.core.hookenv import log
 
 
-fresh_rss_dir = Path('/usr/share/FreshRSS')
+fresh_rss_dir = Path('/var/snap/fresh-rss/current')
 
 
 def run(args):
@@ -19,12 +19,11 @@ def run_root(args):
 
 def apply_permissions():
     log('Applying permissions')
-    run_root(['chown', '-R', 'www-data', str(fresh_rss_dir)])
-    run(['chmod', '-R', 'g+r', str(fresh_rss_dir)])
-    run(['chmod', '-R', 'g+w', str(fresh_rss_dir)])
-    run(['chmod', '-R', 'g+w', str(fresh_rss_dir.joinpath('data'))])
+    run_root(['chown', '-R', ':www-data', str(fresh_rss_dir)])
+    run_root(['chown', '-RL', ':www-data', str(fresh_rss_dir / 'data')])
+    run_root(['chmod', '-R', 'g+r', str(fresh_rss_dir)])
+    run_root(['chmod', '-R', 'g+rw', str(fresh_rss_dir / 'data')])
 
 
 def run_script(script, opts=[]):
-    cmd = [str(fresh_rss_dir.joinpath('cli', '{}.php'.format(script))), *opts]
-    run(cmd)
+    run([str(fresh_rss_dir / 'cli' / '{}.php'.format(script)), *opts])

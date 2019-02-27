@@ -1,16 +1,19 @@
 includes: 
 - layer:basic
-- layer:nginx
+- layer:snap
 - layer:apt
+- layer:nginx
 - layer:status
 - layer:leadership
 - interface:mysql-shared
 - interface:pgsql
 repo: https://github.com/tylerscheuble/juju-charm-fresh-rss
 options:
+  snap:
+    fresh-rss:
+      channel: candidate
   apt:
     packages:
-      - git
       - php7.2
       - php7.2-fpm
       - php7.2-curl
